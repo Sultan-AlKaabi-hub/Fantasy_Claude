@@ -23,8 +23,10 @@
  *     save lives in IndexedDB and never leaves the device.
  *   • Push — no notifications are sent by this game.
  */
-const VERSION = '__BUILD__';                       // replaced at deploy; falls back to a literal
-const CACHE = `gloomfall-${VERSION === '__BUILD__' ? 'dev' : VERSION}`;
+const VERSION = '__BUILD__';                       // replaced with the commit SHA at deploy
+// A placeholder that survived (local dev) starts with '__'; the sed in CI replaces every
+// occurrence, so the check must not repeat the literal.
+const CACHE = `gloomfall-${VERSION.startsWith('__') ? 'dev' : VERSION}`;
 
 const SHELL = [
   './',
