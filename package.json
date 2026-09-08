@@ -13,6 +13,6 @@
     "e2e": "npx --yes playwright@1.47 test tests/e2e",
     "check": "npm test && node tools/check-precache.mjs"
   },
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=22" },
   "license": "MIT"
 }
