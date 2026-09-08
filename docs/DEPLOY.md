@@ -53,3 +53,16 @@ Push to `main`. Pages redeploys, the service worker notices the new version, and
 | Old version keeps showing | Hard-reload once, or wait for the "Reload" toast. Every deploy has a new cache name. |
 | Touch controls missing | Pause → **Touch controls** → **Always on**. Auto mode shows them on any touchscreen. |
 | No sound on iOS | Sound starts after the first tap (browser rule). Also check the mute toggle in Pause. |
+
+## Mobile compatibility (checked)
+
+| Area | iOS Safari / WKWebView (median) | Android Chrome / WebView (median) |
+|---|---|---|
+| Minimum version | iOS 14+ (optional chaining, `\p{L}` regex, pointer events) | Chrome 80+ / WebView 80+ |
+| Touch controls | Pointer events with capture; `touch-action: none` on pads; long-press callout and double-tap zoom disabled | Same code path; 5-point multitouch tested in emulation |
+| Audio & music | Starts after the first tap (WebAudio rule); resumes on return from background | Same |
+| Vibration | Not supported by iOS; call is skipped silently | `navigator.vibrate` after the first tap |
+| Saves offline | IndexedDB + localStorage mirror; private mode falls back to memory + mirror | IndexedDB + mirror |
+| Rotation | `orientation: any`; layout re-fits on `orientationchange` and `visualViewport` resize; safe-area insets respected | Same |
+| Install | Share → Add to Home Screen (`apple-mobile-web-app-capable`) | Install prompt on the title screen |
+| Offline | Service worker precaches the whole app on first load | Same |

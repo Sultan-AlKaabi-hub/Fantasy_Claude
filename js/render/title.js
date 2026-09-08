@@ -12,8 +12,6 @@
 import { makeCanvas } from './sprites.js';
 import { mulberry32 } from '../core/util.js';
 
-const W = 320, H = 180;
-const SUN_X = 250;
 const R = (g, x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
 
 function tower(g, x, base, w, h, col, roofCol) {
@@ -23,7 +21,7 @@ function tower(g, x, base, w, h, col, roofCol) {
 }
 
 /** Static layers: sky is drawn live (it animates), everything else is baked. */
-function bakeScene() {
+function bakeScene(W, H) {
   const rng = mulberry32(0xCA571E);
   const far = makeCanvas(W, H), near = makeCanvas(W, H);
 
@@ -37,7 +35,7 @@ function bakeScene() {
     R(far.g, x, H - 62 - r, 1, 62 + r, '#33306a');
   }
   // castle on the ridge
-  const cx = 62, base = H - 88;
+  const cx = Math.round(W * 0.2), base = H - 88;
   R(far.g, cx - 34, base - 10, 68, 10, '#2a2452');                                // curtain wall
   for (let i = 0; i < 68; i += 4) R(far.g, cx - 34 + i, base - 12, 2, 2, '#2a2452');
   tower(far.g, cx - 40, base, 10, 26, '#2a2452', '#4a3f7a');
@@ -70,7 +68,7 @@ function bakeScene() {
   };
   bigTree(-4, 1); bigTree(W - 4, -1);
   // pond glint at the bottom
-  for (let x = 90; x < 230; x += 3) if (rng() < 0.5) R(near.g, x, H - 12 + ((rng() * 6) | 0), 2, 1, '#7fb0c8');
+  for (let x = W * 0.28; x < W * 0.72; x += 3) if (rng() < 0.5) R(near.g, x, H - 12 + ((rng() * 6) | 0), 2, 1, '#7fb0c8');
 
   return { far: far.c, near: near.c };
 }
@@ -79,19 +77,28 @@ export class TitleScene {
   constructor(canvas) {
     this.canvas = canvas;
     this.out = canvas.getContext('2d', { alpha: false });
-    const buf = makeCanvas(W, H);
-    this.buf = buf.c; this.g = buf.g;
-    this.layers = bakeScene();
+    this.W = 0; this.H = 0;
     this.t = 0;
     this.raf = 0;
     this.reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this._tick = this._tick.bind(this);
+    this.setDims(320, 180);
+  }
+
+  /** (Re)build the scene for a given aspect: 320×180 landscape, 200×320 portrait. */
+  setDims(W, H) {
+    if (W === this.W && H === this.H) return;
+    this.W = W; this.H = H;
+    const buf = makeCanvas(W, H);
+    this.buf = buf.c; this.g = buf.g;
+    this.layers = bakeScene(W, H);
+    this.sunX = Math.round(W * 0.78);
     const rng = mulberry32(0x1EAF);
     this.leaves = Array.from({ length: 28 }, () => ({
       x: rng() * W, y: rng() * H, vx: 0.6 + rng() * 0.9, vy: 0.1 + rng() * 0.25,
       ph: rng() * Math.PI * 2, col: ['#e0453a', '#ff8a2a', '#f2c94c', '#c93a52'][(rng() * 4) | 0], s: 1 + ((rng() * 2) | 0),
     }));
-    this.rays = Array.from({ length: 5 }, (_, i) => ({ x: 150 + i * 42, w: 8 + i * 3 }));
-    this._tick = this._tick.bind(this);
+    this.rays = Array.from({ length: 5 }, (_, i) => ({ x: Math.round(W * 0.45) + i * Math.round(W * 0.13), w: 8 + i * 3 }));
   }
 
   start() { if (!this.raf) this.raf = requestAnimationFrame(this._tick); }
@@ -103,6 +110,7 @@ export class TitleScene {
     this.canvas.width = Math.max(1, Math.round(r.width * dpr));
     this.canvas.height = Math.max(1, Math.round(r.height * dpr));
     this.out.imageSmoothingEnabled = false;
+    if (r.height > r.width) this.setDims(200, 320); else this.setDims(320, 180);
   }
 
   _tick() {
@@ -112,7 +120,7 @@ export class TitleScene {
   }
 
   draw() {
-    const g = this.g, t = this.t;
+    const g = this.g, t = this.t, W = this.W, H = this.H, SUN_X = this.sunX;
     // sky
     const sky = g.createLinearGradient(0, 0, 0, H);
     sky.addColorStop(0, '#1b1440'); sky.addColorStop(0.45, '#6a3f8f'); sky.addColorStop(0.72, '#f08a5d'); sky.addColorStop(1, '#ffd166');
@@ -156,19 +164,11 @@ export class TitleScene {
     vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(8,4,20,0.55)');
     g.fillStyle = vg; g.fillRect(0, 0, W, H);
 
-    // Landscape: cover (crop the long edge). Portrait: fit the width, anchor the
-    // scene to the top so the castle stays visible above the panel, and extend
-    // the ground colour below it.
+    // Cover the display canvas (the scene is baked for the current orientation,
+    // so only a thin sliver is ever cropped).
     const cw = this.canvas.width, ch = this.canvas.height;
-    const o = this.out;
-    if (cw >= ch) {
-      const scale = Math.max(cw / W, ch / H);
-      const dw = W * scale, dh = H * scale;
-      o.drawImage(this.buf, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
-    } else {
-      const scale = cw / W, dh = H * scale;
-      o.fillStyle = '#0f2a22'; o.fillRect(0, 0, cw, ch);
-      o.drawImage(this.buf, 0, 0, cw, dh);
-    }
+    const scale = Math.max(cw / W, ch / H);
+    const dw = W * scale, dh = H * scale;
+    this.out.drawImage(this.buf, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
   }
 }

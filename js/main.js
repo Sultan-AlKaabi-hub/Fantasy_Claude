@@ -93,6 +93,8 @@ function renderCharacters(bank) {
     const name = document.createElement('span'); name.className = 'name'; name.textContent = ch.name;
     const desc = document.createElement('span'); desc.className = 'desc'; desc.textContent = ch.desc;
     label.append(radio, cv, name, desc);
+    if (i === 0) label.classList.add('is-selected');
+    radio.addEventListener('change', () => { ui.charList.querySelectorAll('.char').forEach((c) => c.classList.remove('is-selected')); label.classList.add('is-selected'); });
     ui.charList.append(label);
   });
 }
