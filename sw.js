@@ -33,6 +33,8 @@ const SHELL = [
   './manifest.json',
   './css/app.css',
   './js/main.js',
+  './js/config.js',
+  './js/core/qr.js',
   './js/game.js',
   './js/combat.js',
   './js/core/constants.js',

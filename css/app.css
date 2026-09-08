@@ -129,6 +129,17 @@ body {
 .act-dash { right: 22px; bottom: 82px; background: rgba(224, 179, 74, 0.45); }
 .act-parry { right: 100px; bottom: 96px; background: rgba(150, 90, 255, 0.45); }
 
+/* ---------- install dialog ---------- */
+.install { width: min(620px, 100%); }
+.install-grid { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+@media (min-width: 560px) { .install-grid { grid-template-columns: 232px 1fr; } }
+.qr { margin: 0; display: grid; justify-items: center; gap: 6px; }
+.qr canvas { width: 232px; height: 232px; max-width: 100%; border-radius: 8px; image-rendering: pixelated; background: #fff; }
+.install-actions { display: grid; gap: 10px; }
+.install-actions .btn { text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; }
+.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 14px; display: grid; gap: 4px; }
+.url { word-break: break-all; user-select: text; -webkit-user-select: text; }
+
 /* ---------- screens ---------- */
 .screen {
   position: absolute; inset: 0; z-index: 10;

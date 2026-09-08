@@ -49,6 +49,9 @@ npm run e2e        # Playwright smoke tests (needs network for npx)
 3. Give median.co the Pages URL. The manifest, icons, auto-rotation and full offline cache are already in place, so the wrapped Android/iOS app works with the same code. Enable "Offline mode" in median if you want the wrapper's own cache on top; the service worker already covers it.
 
 Everything uses relative paths (`./`), so the site works from a sub-path such as `/repo-name/`.
+4. The title screen's **Install on your phone** button shows a QR code and the right install path per device. Paste your Play Store / App Store links into [js/config.js](js/config.js) when median.co provides them (see [docs/DEPLOY.md](docs/DEPLOY.md)).
+
+![QR code to the live game](screenshots/qr-web.png)
 
 ## Project layout
 

@@ -19,6 +19,8 @@ import { Backdrop } from './render/backdrop.js';
 import { TitleScene } from './render/title.js';
 import { CHARACTERS } from './core/constants.js';
 import { sanitizeName, formatTime } from './core/util.js';
+import { APP_LINKS } from './config.js';
+import { encodeQR, drawQR } from './core/qr.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -33,6 +35,9 @@ const ui = {
   victoryStats: $('#victory-stats'), btnAgain: $('#btn-again'), btnVictoryTitle: $('#btn-victory-title'),
   btnInstall: $('#btn-install'), btnControls: $('#btn-controls'), controlsHelp: $('#controls-help'),
   toast: $('#toast'), toastText: $('#toast-text'), toastBtn: $('#toast-btn'),
+  install: $('#screen-install'), qr: $('#qr-canvas'), installStatus: $('#install-status'), btnInstallNow: $('#btn-install-now'),
+  lnkAndroid: $('#lnk-android'), lnkIos: $('#lnk-ios'), iosSteps: $('#ios-steps'), androidSteps: $('#android-steps'),
+  btnCopyLink: $('#btn-copy-link'), btnShareLink: $('#btn-share-link'), installUrl: $('#install-url'), btnInstallClose: $('#btn-install-close'),
 };
 
 let game, store, profile, audio, input, titleScene;
@@ -44,7 +49,7 @@ const BOOT_PARAMS = new URLSearchParams(location.search);
 /* Screens                                                             */
 /* ------------------------------------------------------------------ */
 function show(screen) {
-  for (const s of [ui.title, ui.pause, ui.dead, ui.victory]) s.hidden = s !== screen;
+  for (const s of [ui.title, ui.pause, ui.dead, ui.victory, ui.install]) s.hidden = s !== screen;
   if (screen === ui.title) { titleScene?.fit(); titleScene?.start(); audio?.playTheme('title'); } else titleScene?.stop();
   ui.topbar.hidden = screen !== null;
   applyTouchVisibility();
@@ -198,20 +203,81 @@ async function registerServiceWorker() {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Install dialog: QR code + the right action for each platform        */
+/* ------------------------------------------------------------------ */
+const platform = (() => {
+  const ua = navigator.userAgent || '';
+  const iOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const android = /Android/.test(ua);
+  const standalone = matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
+  return { iOS, android, mobile: iOS || android, standalone, safari: iOS && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua) };
+})();
+
+/** The address the QR encodes: the web page (it offers the right install for every phone). */
+const installUrl = () => APP_LINKS.web || location.href.split('?')[0];
+
+let qrDrawn = false;
+function drawInstallQR() {
+  if (qrDrawn) return;
+  try {
+    const qr = encodeQR(installUrl());
+    const g = ui.qr.getContext('2d');
+    const cell = Math.floor(ui.qr.width / (qr.size + 8));
+    const px = (qr.size + 8) * cell;
+    ui.qr.width = px; ui.qr.height = px;
+    drawQR(qr, g, 0, 0, cell, 4);
+    qrDrawn = true;
+  } catch (err) { console.warn('QR', err); ui.qr.hidden = true; }
+}
+
+function openInstallDialog() {
+  drawInstallQR();
+  ui.installUrl.textContent = installUrl();
+  const st = ui.installStatus;
+  ui.btnInstallNow.hidden = true; ui.lnkAndroid.hidden = true; ui.lnkIos.hidden = true; ui.iosSteps.hidden = true; ui.androidSteps.hidden = true;
+  ui.btnShareLink.hidden = !navigator.share;
+
+  if (platform.standalone) {
+    st.textContent = 'Gloomfall is already installed on this device. Scan the code to put it on another phone.';
+  } else if (platform.iOS) {
+    if (APP_LINKS.ios) { ui.lnkIos.href = APP_LINKS.ios; ui.lnkIos.hidden = false; st.textContent = 'Download from the App Store:'; }
+    else { st.textContent = platform.safari ? 'Add Gloomfall to your Home Screen:' : 'Open this page in Safari, then:'; ui.iosSteps.hidden = false; }
+  } else if (platform.android) {
+    if (APP_LINKS.android) { ui.lnkAndroid.href = APP_LINKS.android; ui.lnkAndroid.hidden = false; st.textContent = 'Download from Google Play:'; }
+    else if (deferredInstall) { ui.btnInstallNow.hidden = false; st.textContent = 'Install Gloomfall as an app. It works offline and opens full-screen.'; }
+    else { st.textContent = 'Install from your browser menu:'; ui.androidSteps.hidden = false; }
+    if (APP_LINKS.androidApk) { ui.lnkAndroid.href = APP_LINKS.androidApk; ui.lnkAndroid.textContent = 'Download APK'; ui.lnkAndroid.hidden = false; }
+  } else {
+    st.textContent = 'Scan the QR code with your phone to install Gloomfall on Android or iPhone.';
+    if (deferredInstall) { ui.btnInstallNow.hidden = false; ui.btnInstallNow.textContent = 'Install on this computer'; }
+    if (APP_LINKS.android) { ui.lnkAndroid.href = APP_LINKS.android; ui.lnkAndroid.hidden = false; }
+    if (APP_LINKS.ios) { ui.lnkIos.href = APP_LINKS.ios; ui.lnkIos.hidden = false; }
+  }
+  show(ui.install);
+}
+
 function wireInstallPrompt() {
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredInstall = e;
-    ui.btnInstall.hidden = false;
-  });
-  ui.btnInstall.addEventListener('click', async () => {
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstall = e; });
+  ui.btnInstall.addEventListener('click', openInstallDialog);
+  ui.btnInstallClose.addEventListener('click', () => { refreshTitle(); show(ui.title); });
+  ui.btnInstallNow.addEventListener('click', async () => {
     if (!deferredInstall) return;
     deferredInstall.prompt();
-    await deferredInstall.userChoice.catch(() => {});
+    const choice = await deferredInstall.userChoice.catch(() => null);
     deferredInstall = null;
-    ui.btnInstall.hidden = true;
+    if (choice?.outcome === 'accepted') { show(ui.title); }
+    else ui.btnInstallNow.hidden = true;
   });
-  window.addEventListener('appinstalled', () => { ui.btnInstall.hidden = true; toast('Installed. Gloomfall now works offline.'); });
+  ui.btnCopyLink.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(installUrl()); toast('Link copied.'); }
+    catch { toast('Copy failed. The link is shown below the buttons.'); }
+  });
+  ui.btnShareLink.addEventListener('click', () => {
+    navigator.share?.({ title: 'Gloomfall', text: 'Play Gloomfall, a dark Metroidvania that works offline.', url: installUrl() }).catch(() => {});
+  });
+  window.addEventListener('appinstalled', () => { toast('Installed. Gloomfall now works offline.'); if (!ui.install.hidden) show(ui.title); });
+  if (platform.standalone) ui.btnInstall.textContent = 'Share / install on another phone';
 }
 
 /* ------------------------------------------------------------------ */

@@ -41,7 +41,34 @@ What the workflow does: runs the unit tests, checks the service-worker precache 
    - **Haptics** are provided by the web `navigator.vibrate` API on Android; iOS WebView ignores it silently.
 4. Build the Android APK / iOS project from median's dashboard and test on a device.
 
-## 5. Updating the game later
+## 5. Install button, QR code and store links
+
+The title screen has an **Install on your phone** button. It opens a dialog with a QR code of the
+live URL (drawn by the in-app encoder in `js/core/qr.js`, no network needed) and the right action
+for the visitor's device:
+
+| Device | What the dialog shows |
+|---|---|
+| Android, Chrome | Native **Install now** prompt (PWA), or the Google Play link once you add it |
+| iPhone / iPad | App Store link once you add it; otherwise the Share → Add to Home Screen steps |
+| Desktop | The QR code to scan, plus a desktop install button if the browser offers one |
+| Already installed | A note plus the QR code for sharing to another phone |
+
+When median.co gives you the store URLs, paste them into **`js/config.js`**:
+
+```js
+export const APP_LINKS = Object.freeze({
+  web: 'https://sultan-alkaabi-hub.github.io/Fantasy_Claude/',
+  android: 'https://play.google.com/store/apps/details?id=...',   // from median.co
+  ios: 'https://apps.apple.com/app/id...',                         // from median.co
+  androidApk: '',                                                   // optional direct APK link
+});
+```
+
+Commit and push; the dialog switches to the store links automatically. A printable version of the
+QR code is at `screenshots/qr-web.png` (regenerate with `python tools/gen-qr.py` if the URL changes).
+
+## 6. Updating the game later
 
 Push to `main`. Pages redeploys, the service worker notices the new version, and players see "A new version is ready — Reload" the next time they open the app. The median wrapper needs no rebuild because it loads the live site.
 
