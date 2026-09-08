@@ -15,6 +15,9 @@ export class AudioSystem {
     this.muted = false;
     this.ambient = null;
     this.zone = null;
+    this.musicOn = true;
+    this.music = null;       // { theme, out, gain, step, nextTime, timer }
+    this.theme = null;
   }
 
   unlock() {
@@ -26,6 +29,93 @@ export class AudioSystem {
     this.master.gain.value = this.muted ? 0 : 0.5;
     this.master.connect(this.ctx.destination);
     this._noise = this._makeNoise(1.5);
+  }
+
+  setMusicEnabled(on) {
+    this.musicOn = on;
+    if (!on) this.stopMusic();
+    else if (this.theme) { const t = this.theme; this.theme = null; this.playTheme(t); }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* Generative music: a small lookahead scheduler plays a chord   */
+  /* progression (pad + bass + arpeggio) so the game ships no     */
+  /* audio files. Themes are keyed by screen / zone.               */
+  /* ------------------------------------------------------------ */
+  playTheme(name) {
+    if (!this.ctx || !this.musicOn || name === this.theme) return;
+    this.stopMusic();
+    this.theme = name;
+    const T = THEMES[name] || THEMES.title;
+    const c = this.ctx;
+    const gain = c.createGain(); gain.gain.value = 0;
+    gain.gain.setTargetAtTime(T.volume, c.currentTime, 1.2);
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800;
+    lp.connect(gain).connect(this.master);
+    const m = { theme: T, out: lp, gain, step: 0, nextTime: c.currentTime + 0.1, timer: 0 };
+    this.music = m;
+    const stepDur = 60 / T.bpm / 2;                 // eighth notes
+    const schedule = () => {
+      if (this.music !== m) return;
+      let guard = 0;
+      while (m.nextTime < c.currentTime + 0.3 && guard++ < 64) {   // guard: never spin if the tab was asleep
+        this._playStep(m, m.step, m.nextTime, stepDur);
+        m.step++;
+        m.nextTime += stepDur;
+      }
+    };
+    schedule();
+    m.timer = setInterval(schedule, 120);
+  }
+
+  stopMusic() {
+    const m = this.music;
+    if (!m) return;
+    clearInterval(m.timer);
+    m.gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4);
+    setTimeout(() => { try { m.out.disconnect(); } catch { /* ignore */ } }, 2500);
+    this.music = null;
+    this.theme = null;
+  }
+
+  _note(freq, time, dur, type, vol, out, attack = 0.01) {
+    const c = this.ctx;
+    const o = c.createOscillator(); o.type = type; o.frequency.value = freq;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, time);
+    g.gain.linearRampToValueAtTime(vol, time + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+    o.connect(g).connect(out);
+    o.start(time); o.stop(time + dur + 0.05);
+  }
+
+  _playStep(m, step, time, stepDur) {
+    const T = m.theme;
+    const barLen = 8;                                     // eighths per bar
+    const chord = T.chords[Math.floor(step / (barLen * 2)) % T.chords.length];
+    const inBar = step % barLen;
+    // pad: one sustained voice per chord change
+    if (step % (barLen * 2) === 0) {
+      for (const semi of chord) this._note(midi(T.root + semi + 12), time, stepDur * barLen * 2, 'triangle', 0.05, m.out, 0.6);
+    }
+    // bass on beats 1 and 3
+    if (inBar === 0 || inBar === 4) this._note(midi(T.root + chord[0]), time, stepDur * 3, 'sine', 0.16, m.out);
+    // arpeggio
+    const arp = T.pattern[step % T.pattern.length];
+    if (arp !== null) {
+      const semi = chord[arp % chord.length] + 12 * Math.floor(arp / chord.length);
+      this._note(midi(T.root + semi + 24), time, stepDur * 1.6, T.lead, 0.07, m.out);
+    }
+    // soft percussion tick for the keep
+    if (T.tick && inBar % 2 === 0) this._noiseHitAt(time, inBar === 0 ? 0.12 : 0.05, m.out);
+  }
+
+  _noiseHitAt(time, gain, out) {
+    const c = this.ctx;
+    const src = c.createBufferSource(); src.buffer = this._noise;
+    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 400;
+    const g = c.createGain(); g.gain.setValueAtTime(gain, time); g.gain.exponentialRampToValueAtTime(0.0001, time + 0.12);
+    src.connect(f).connect(g).connect(out); src.start(time); src.stop(time + 0.15);
   }
 
   setMuted(m) {
@@ -92,15 +182,16 @@ export class AudioSystem {
     }
   }
 
-  /** Per-zone ambient drone: two detuned oscillators through a low-pass. */
+  /** Per-zone ambient drone plus the zone's music theme. */
   setZone(zoneId) {
     if (!this.ctx || zoneId === this.zone) return;
     this.zone = zoneId;
+    this.playTheme(zoneId);
     this.stopAmbient();
     const c = this.ctx;
     const base = zoneId === 'market' ? 110 : zoneId === 'chapel' ? 82.4 : 55;
     const g = c.createGain(); g.gain.value = 0;
-    g.gain.setTargetAtTime(0.08, c.currentTime, 1.5);
+    g.gain.setTargetAtTime(0.04, c.currentTime, 1.5);
     const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = zoneId === 'keep' ? 240 : 420;
     const oscs = [0, 3, -5].map((det) => {
       const o = c.createOscillator();
@@ -122,3 +213,17 @@ export class AudioSystem {
     this.ambient = null;
   }
 }
+
+/** MIDI note number → Hz. */
+function midi(n) { return 440 * Math.pow(2, (n - 69) / 12); }
+
+/**
+ * Themes: root is a MIDI note, chords are semitone stacks over the root,
+ * pattern indexes chord tones (null = rest) per eighth note.
+ */
+const THEMES = {
+  title:  { root: 45, bpm: 76, volume: 0.55, lead: 'triangle', chords: [[0, 3, 7], [-4, 0, 3], [-2, 2, 5], [-5, -1, 2]], pattern: [0, 2, 1, 2, 3, 2, 1, null, 0, 2, 1, 4, 3, 2, null, 1] },
+  market: { root: 48, bpm: 96, volume: 0.5, lead: 'square', chords: [[0, 4, 7], [-3, 0, 4], [-5, -1, 2], [-7, -3, 0]], pattern: [0, null, 1, 2, null, 1, 3, null, 0, 2, null, 1, 4, null, 2, 1] },
+  chapel: { root: 43, bpm: 70, volume: 0.5, lead: 'sine', chords: [[0, 3, 7], [-2, 2, 5], [-4, 0, 3], [-5, -2, 2]], pattern: [0, 1, 2, 3, 4, 3, 2, 1, null, 2, 3, null, 1, 2, null, null] },
+  keep:   { root: 41, bpm: 88, volume: 0.55, lead: 'sawtooth', tick: true, chords: [[0, 3, 7], [1, 4, 8], [-2, 1, 5], [0, 3, 6]], pattern: [0, null, 0, 2, null, 1, null, 3, 0, null, 0, 2, 4, null, 1, null] },
+};

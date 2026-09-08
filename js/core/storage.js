@@ -39,6 +39,7 @@ export function createDefaultProfile() {
     },
     settings: {
       muted: false,
+      music: true,
       haptics: true,
       reduceMotion: false,
       touchControls: 'auto',     // 'auto' | 'on' | 'off'
@@ -72,6 +73,7 @@ export function normalizeProfile(raw) {
   const s = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
   p.settings = {
     muted: bool(s.muted, false),
+    music: bool(s.music, true),
     haptics: bool(s.haptics, true),
     reduceMotion: bool(s.reduceMotion, false),
     touchControls: ['auto', 'on', 'off'].includes(s.touchControls) ? s.touchControls : 'auto',

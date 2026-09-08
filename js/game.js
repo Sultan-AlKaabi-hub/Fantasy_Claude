@@ -133,6 +133,7 @@ export class Game extends Emitter {
     this.camera.bounds = { w: this.level.pixelW, h: this.level.pixelH };
     this.camera.reduceMotion = !!profile.settings.reduceMotion || matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.audio.setMuted(!!profile.settings.muted);
+    this.audio.setMusicEnabled(profile.settings.music !== false);
 
     this.checkpoints = this.level.checkpoints.map((c) => ({ ...c }));
     this.pickups = this.level.pickups.map((s) => ({ ...s, taken: profile.run.shards.includes(s.id) }));

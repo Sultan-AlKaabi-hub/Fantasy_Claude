@@ -67,7 +67,8 @@
 
     <!-- Title / profile screen -->
     <section id="screen-title" class="screen screen-title" aria-labelledby="title-heading">
-      <div class="panel">
+      <canvas id="title-bg" class="title-bg" aria-hidden="true"></canvas>
+      <div class="panel panel-title">
         <p class="eyebrow">A dark, colourful Metroidvania</p>
         <h1 id="title-heading" class="title">GLOOMFALL</h1>
         <p class="subtitle">The Pilgrim's Road</p>
@@ -110,6 +111,7 @@
           <p>Gamepad: A jump · X attack · B dash · Y parry · Start pause. Touch: on-screen pad and buttons.</p>
           <p>Slide down walls by pushing into them; jump off to climb. Parry when the enemy's telegraph flashes white, then strike to execute.</p>
         </div>
+        <label class="toggle toggle-inline"><input id="chk-music-title" type="checkbox" checked><span>Music</span></label>
         <p class="footer muted">Works offline · your progress stays on this device</p>
       </div>
     </section>
@@ -119,7 +121,8 @@
       <div class="panel panel-small">
         <h2 id="pause-heading" class="h2">Paused</h2>
         <div class="settings">
-          <label class="toggle"><input id="chk-mute" type="checkbox"><span>Mute audio</span></label>
+          <label class="toggle"><input id="chk-mute" type="checkbox"><span>Mute all audio</span></label>
+          <label class="toggle"><input id="chk-music" type="checkbox"><span>Music</span></label>
           <label class="toggle"><input id="chk-haptics" type="checkbox"><span>Vibration on hits</span></label>
           <label class="toggle"><input id="chk-motion" type="checkbox"><span>Reduce screen shake</span></label>
           <label class="field"><span class="label">Touch controls</span>

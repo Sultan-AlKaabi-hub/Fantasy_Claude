@@ -56,11 +56,11 @@ Lerp toward `player.cx + lookAhead` where lookAhead itself lerps toward `facing 
 
 `core/storage.js`: **IndexedDB** is the durable store; **localStorage mirrors** the same JSON for a synchronous first paint and as a fallback (private mode / restricted WebViews). `navigator.storage.persist()` is requested once. Every read passes through `normalizeProfile()` which fills defaults and rejects anything off-schema, so hand-edited or corrupt data degrades to defaults. Writes are coalesced per frame; the mirror is written synchronously so a refresh mid-save loses nothing. Saves happen on checkpoint, shard pickup, pause, hide, `pagehide`, victory and quit.
 
-Profile shape: `{ schema, id, name, character, run: { checkpoint, shards[], kills, deaths, timeMs, completed, bestTimeMs }, settings: { muted, haptics, reduceMotion, touchControls } }`.
+Profile shape: `{ schema, id, name, character, run: { checkpoint, shards[], kills, deaths, timeMs, completed, bestTimeMs }, settings: { muted, music, haptics, reduceMotion, touchControls } }`.
 
 ## 4. PWA
 
-**Manifest** (`manifest.json`): `id`, `start_url` with a `source=pwa` marker, `scope ./`, `display: standalone` with `display_override [fullscreen, standalone, minimal-ui]`, `orientation: landscape`, theme/background colours matching the shell, icons 72→512 (`any`), 192/512 (`maskable`, art inside the 80 % safe zone), a `monochrome` icon, wide + narrow **screenshots** for the richer install UI, two **shortcuts** (continue / new) that deep-link via `?action=`, `launch_handler: focus-existing`, categories. `share_target` is intentionally omitted: the game shares nothing.
+**Manifest** (`manifest.json`): `id`, `start_url` with a `source=pwa` marker, `scope ./`, `display: standalone` with `display_override [fullscreen, standalone, minimal-ui]`, `orientation: any` (the layout adapts to portrait and landscape), theme/background colours matching the shell, icons 72→512 (`any`), 192/512 (`maskable`, art inside the 80 % safe zone), a `monochrome` icon, wide + narrow **screenshots** for the richer install UI, two **shortcuts** (continue / new) that deep-link via `?action=`, `launch_handler: focus-existing`, categories. `share_target` is intentionally omitted: the game shares nothing.
 
 **Service worker** (`sw.js`):
 

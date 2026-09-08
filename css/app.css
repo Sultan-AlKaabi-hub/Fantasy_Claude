@@ -26,6 +26,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; margin: 0; }
 body {
   background: var(--bg);
@@ -70,6 +71,7 @@ body {
 /* portrait: push the viewport up so thumbs have room below */
 @media (orientation: portrait) {
   .stage { align-items: flex-start; padding-top: calc(var(--sat) + 6vh); }
+  .screen-title { align-items: flex-start; padding-top: calc(var(--sat) + 30vh); }
 }
 
 /* ---------- top bar ---------- */
@@ -135,7 +137,18 @@ body {
   overflow-y: auto; -webkit-overflow-scrolling: touch;
 }
 .screen[hidden] { display: none; }
-.screen-title { background: linear-gradient(180deg, rgba(20, 8, 40, 0.85), rgba(6, 4, 12, 0.92)); }
+.screen-title { background: #1b1440; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.title-bg { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+.panel-title { position: relative; background: rgba(14, 10, 26, 0.72); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+.toggle-inline { justify-content: center; min-height: 40px; font-size: 14px; color: var(--muted); }
+@media (orientation: landscape) and (max-height: 480px) {
+  .panel-title { padding: 12px 16px 10px; }
+  .title { font-size: clamp(28px, 6vh, 44px); }
+  .subtitle { margin-bottom: 8px; }
+  .char { min-height: 84px; padding: 6px 4px; }
+  .char canvas { width: 40px; height: 40px; }
+  .char .desc { display: none; }
+}
 
 .panel {
   width: min(560px, 100%);

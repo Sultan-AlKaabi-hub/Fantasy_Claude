@@ -32,7 +32,7 @@ What the workflow does: runs the unit tests, checks the service-worker precache 
 2. Paste the Pages URL as the **Website URL**.
 3. Suggested settings:
    - **App name**: Gloomfall · **Bundle ID**: your choice.
-   - **Orientation**: Landscape (matches `manifest.json`).
+   - **Orientation**: Auto / all orientations (matches `"orientation": "any"` in `manifest.json`; the layout adapts to portrait and landscape).
    - **Status bar**: hidden or dark.
    - **Icons / splash**: upload `icons/icon-512.png` and `icons/maskable-512.png`; splash background `#0b0912`.
    - **Offline**: leave the default. The site's own service worker already caches everything.

@@ -52,6 +52,7 @@ const SHELL = [
   './js/render/backdrop.js',
   './js/render/renderer.js',
   './js/render/hud.js',
+  './js/render/title.js',
   './icons/favicon-32.png',
   './icons/icon-192.png',
   './icons/icon-512.png',

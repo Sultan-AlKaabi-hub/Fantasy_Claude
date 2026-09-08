@@ -46,7 +46,7 @@ npm run e2e        # Playwright smoke tests (needs network for npx)
 
 1. Push to a GitHub repository. In **Settings → Pages** choose **GitHub Actions** as the source.
 2. `.github/workflows/deploy.yml` runs tests, stamps the service-worker version with the commit SHA, and publishes the site. Every push to `main` deploys.
-3. Give median.co the Pages URL. The manifest, icons, `landscape` orientation and full offline cache are already in place, so the wrapped Android/iOS app works with the same code. Enable "Offline mode" in median if you want the wrapper's own cache on top; the service worker already covers it.
+3. Give median.co the Pages URL. The manifest, icons, auto-rotation and full offline cache are already in place, so the wrapped Android/iOS app works with the same code. Enable "Offline mode" in median if you want the wrapper's own cache on top; the service worker already covers it.
 
 Everything uses relative paths (`./`), so the site works from a sub-path such as `/repo-name/`.
 

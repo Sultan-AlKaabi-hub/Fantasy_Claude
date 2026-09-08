@@ -16,6 +16,7 @@ import { AudioSystem } from './core/audio.js';
 import { ProfileStore, createDefaultProfile } from './core/storage.js';
 import { SpriteBank } from './render/sprites.js';
 import { Backdrop } from './render/backdrop.js';
+import { TitleScene } from './render/title.js';
 import { CHARACTERS } from './core/constants.js';
 import { sanitizeName, formatTime } from './core/util.js';
 
@@ -28,13 +29,13 @@ const ui = {
   continueBlock: $('#continue-block'), continueName: $('#continue-name'), continueStats: $('#continue-stats'),
   btnContinue: $('#btn-continue'), btnNew: $('#btn-new'), btnCancelNew: $('#btn-cancel-new'),
   btnPause: $('#btn-pause'), btnResume: $('#btn-resume'), btnQuit: $('#btn-quit'),
-  chkMute: $('#chk-mute'), chkHaptics: $('#chk-haptics'), chkMotion: $('#chk-motion'), selTouch: $('#sel-touch'),
+  chkMute: $('#chk-mute'), chkMusic: $('#chk-music'), chkMusicTitle: $('#chk-music-title'), titleBg: $('#title-bg'), chkHaptics: $('#chk-haptics'), chkMotion: $('#chk-motion'), selTouch: $('#sel-touch'),
   victoryStats: $('#victory-stats'), btnAgain: $('#btn-again'), btnVictoryTitle: $('#btn-victory-title'),
   btnInstall: $('#btn-install'), btnControls: $('#btn-controls'), controlsHelp: $('#controls-help'),
   toast: $('#toast'), toastText: $('#toast-text'), toastBtn: $('#toast-btn'),
 };
 
-let game, store, profile, audio, input;
+let game, store, profile, audio, input, titleScene;
 let deferredInstall = null;
 // Captured before boot() strips the query string (shortcut deep links, dev flags).
 const BOOT_PARAMS = new URLSearchParams(location.search);
@@ -44,6 +45,7 @@ const BOOT_PARAMS = new URLSearchParams(location.search);
 /* ------------------------------------------------------------------ */
 function show(screen) {
   for (const s of [ui.title, ui.pause, ui.dead, ui.victory]) s.hidden = s !== screen;
+  if (screen === ui.title) { titleScene?.fit(); titleScene?.start(); audio?.playTheme('title'); } else titleScene?.stop();
   ui.topbar.hidden = screen !== null;
   applyTouchVisibility();
   if (screen) {
@@ -141,6 +143,7 @@ function onSubmitNew(e) {
 function syncSettingsUI() {
   const s = profile.settings;
   ui.chkMute.checked = s.muted;
+  ui.chkMusic.checked = s.music;
   ui.chkHaptics.checked = s.haptics;
   ui.chkMotion.checked = s.reduceMotion;
   ui.selTouch.value = s.touchControls;
@@ -148,12 +151,15 @@ function syncSettingsUI() {
 function onSettingsChange() {
   profile.settings = {
     muted: ui.chkMute.checked,
+    music: ui.chkMusic.checked,
     haptics: ui.chkHaptics.checked,
     reduceMotion: ui.chkMotion.checked,
     touchControls: ui.selTouch.value,
   };
   profile = store.save(profile);
   audio.setMuted(profile.settings.muted);
+  audio.setMusicEnabled(profile.settings.music);
+  ui.chkMusicTitle.checked = profile.settings.music;
   game.camera.reduceMotion = profile.settings.reduceMotion || matchMedia('(prefers-reduced-motion: reduce)').matches;
   applyTouchVisibility();
 }
@@ -218,6 +224,15 @@ async function boot() {
   input = new Input(ui.stage, ui.touch);
   game = new Game({ canvas: ui.canvas, stage: ui.stage, input, audio, store, bank, backdrop });
 
+  titleScene = new TitleScene(ui.titleBg);
+  audio.musicOn = profile ? profile.settings.music : true;
+  ui.chkMusicTitle.checked = audio.musicOn;
+  ui.chkMusicTitle.addEventListener('change', () => {
+    audio.unlock();
+    audio.setMusicEnabled(ui.chkMusicTitle.checked);
+    if (profile) { profile.settings.music = ui.chkMusicTitle.checked; profile = store.save(profile); }
+    if (ui.chkMusicTitle.checked && !ui.title.hidden) audio.playTheme('title');
+  });
   renderCharacters(bank);
   refreshTitle();
   show(ui.title);
@@ -239,8 +254,8 @@ async function boot() {
   // ----- pause -----
   const togglePause = () => {
     if (!game.running || game.finished) return;
-    if (game.paused) { show(null); game.resume(); }
-    else { game.pause(); syncSettingsUI(); show(ui.pause); }
+    if (game.paused) { show(null); game.resume(); const z = game.currentZone; if (z) { audio.zone = null; audio.setZone(z); } }
+    else { game.pause(); syncSettingsUI(); show(ui.pause); audio.stopMusic(); }
   };
   ui.btnPause.addEventListener('click', togglePause);
   ui.btnResume.addEventListener('click', togglePause);
@@ -261,15 +276,17 @@ async function boot() {
   game.on('live', (msg) => { ui.live.textContent = msg; });
 
   // ----- environment -----
-  const unlock = () => audio.unlock();
+  const unlock = () => { audio.unlock(); if (!ui.title.hidden) audio.playTheme('title'); };
   window.addEventListener('pointerdown', unlock, { passive: true });
   window.addEventListener('keydown', unlock);
-  window.addEventListener('resize', () => game.fit());
+  window.addEventListener('resize', () => { game.fit(); titleScene.fit(); });
   window.visualViewport?.addEventListener('resize', () => game.fit());
-  screen.orientation?.addEventListener?.('change', () => setTimeout(() => game.fit(), 50));
+  screen.orientation?.addEventListener?.('change', () => setTimeout(() => { game.fit(); titleScene.fit(); }, 80));
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && game.running && !game.paused && !game.finished) { game.pause(); syncSettingsUI(); show(ui.pause); }
-    if (document.hidden) game?.save();
+    if (document.hidden) { game?.save(); audio.stopMusic(); }
+    else if (!ui.title.hidden) audio.playTheme('title');
+    else if (game?.running && game.currentZone) { const z = game.currentZone; audio.zone = null; audio.setZone(z); }
   });
   window.addEventListener('pagehide', () => game?.save());
   window.addEventListener('online', () => toast('Back online.'));
@@ -285,7 +302,7 @@ async function boot() {
   registerServiceWorker();
 
   // Debug / e2e hook (read-only use in tests; harmless in production).
-  window.gloomfall = { game, store, version: '1.0.0' };
+  window.gloomfall = { game, store, audio, version: '1.0.0' };
 }
 
 boot().catch((err) => {
