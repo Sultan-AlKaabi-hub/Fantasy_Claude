@@ -1,0 +1,61 @@
+# Deploys the static PWA to GitHub Pages on every push to main.
+# Steps: unit tests → precache check → stamp sw.js VERSION with the commit SHA
+# (so every deploy busts the cache) → upload → deploy. Lighthouse runs as a
+# non-blocking report job.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Unit tests
+        run: npm test
+      - name: Verify service-worker precache list
+        run: node tools/check-precache.mjs
+      - name: Stamp service worker version
+        run: sed -i "s/__BUILD__/${GITHUB_SHA::12}/" sw.js
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp -r index.html offline.html manifest.json sw.js css js icons screenshots _site/
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: _site }
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  lighthouse:
+    needs: deploy
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Lighthouse (mobile, throttled)
+        run: npx --yes @lhci/cli@0.14 autorun --config=lighthouserc.json

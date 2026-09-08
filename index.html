@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <title>Gloomfall: The Pilgrim's Road</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="description" content="A dark, colourful Metroidvania: fluid movement, weighty parry-driven combat. Playable offline, installable, and saves your pilgrim locally.">
+  <!--
+    Security: strict CSP. No inline scripts, no remote origins. Everything the game
+    needs ships in this repo, so 'self' is the only allowed source. `data:` for
+    img-src covers the canvas-generated character previews on the title screen.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; media-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#1a0f2e">
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Gloomfall">
+  <meta name="application-name" content="Gloomfall">
+  <meta name="format-detection" content="telephone=no">
+
+  <link rel="stylesheet" href="./css/app.css">
+  <link rel="modulepreload" href="./js/main.js">
+  <link rel="modulepreload" href="./js/game.js">
+</head>
+<body>
+  <noscript><p class="noscript">Gloomfall needs JavaScript to run.</p></noscript>
+
+  <div id="app" class="app">
+    <!-- Game viewport -->
+    <div id="stage" class="stage" tabindex="0" aria-label="Gloomfall game viewport. Arrow keys or WASD to move, Space to jump, X to attack, C to dash, V to parry, Escape to pause.">
+      <canvas id="game" class="game-canvas" width="384" height="240" role="img" aria-label="Game view"></canvas>
+    </div>
+
+    <!-- Screen-reader mirror of the HUD -->
+    <div id="live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Top bar (in-game) -->
+    <div id="topbar" class="topbar" hidden>
+      <button id="btn-pause" class="icon-btn" type="button" aria-label="Pause">II</button>
+    </div>
+
+    <!-- Touch controls -->
+    <div id="touch" class="touch" hidden>
+      <div class="dpad" role="group" aria-label="Move">
+        <span class="dpad-key dpad-up" data-dir="up" aria-hidden="true"></span>
+        <span class="dpad-key dpad-left" data-dir="left" aria-hidden="true"></span>
+        <span class="dpad-key dpad-right" data-dir="right" aria-hidden="true"></span>
+        <span class="dpad-key dpad-down" data-dir="down" aria-hidden="true"></span>
+        <span class="dpad-center" aria-hidden="true"></span>
+      </div>
+      <div class="actions" role="group" aria-label="Actions">
+        <button class="act act-parry" type="button" data-action="parry" aria-label="Parry">P</button>
+        <button class="act act-dash" type="button" data-action="dash" aria-label="Dash">D</button>
+        <button class="act act-attack" type="button" data-action="attack" aria-label="Attack">A</button>
+        <button class="act act-jump" type="button" data-action="jump" aria-label="Jump">J</button>
+      </div>
+    </div>
+
+    <!-- Title / profile screen -->
+    <section id="screen-title" class="screen screen-title" aria-labelledby="title-heading">
+      <div class="panel">
+        <p class="eyebrow">A dark, colourful Metroidvania</p>
+        <h1 id="title-heading" class="title">GLOOMFALL</h1>
+        <p class="subtitle">The Pilgrim's Road</p>
+
+        <div id="continue-block" class="continue" hidden>
+          <p class="muted">Welcome back, <strong id="continue-name"></strong>.</p>
+          <p id="continue-stats" class="stats"></p>
+          <div class="row">
+            <button id="btn-continue" class="btn btn-primary" type="button">Continue</button>
+            <button id="btn-new" class="btn" type="button">New pilgrim</button>
+          </div>
+        </div>
+
+        <form id="title-form" class="form" autocomplete="off" novalidate>
+          <label class="field">
+            <span class="label">Your name</span>
+            <input id="name-input" name="name" type="text" maxlength="16" minlength="1" required
+                   autocapitalize="words" autocomplete="nickname" spellcheck="false" placeholder="Pilgrim"
+                   aria-describedby="name-help">
+            <span id="name-help" class="help">Letters, numbers, spaces. Saved on this device only.</span>
+          </label>
+
+          <fieldset class="chars">
+            <legend class="label">Choose your pilgrim</legend>
+            <div id="char-list" class="char-list"></div>
+          </fieldset>
+
+          <div class="row">
+            <button id="btn-start" class="btn btn-primary" type="submit">Begin the descent</button>
+            <button id="btn-cancel-new" class="btn" type="button" hidden>Back</button>
+          </div>
+        </form>
+
+        <div class="row row-tight">
+          <button id="btn-install" class="btn btn-ghost" type="button" hidden>Install app</button>
+          <button id="btn-controls" class="btn btn-ghost" type="button" aria-expanded="false" aria-controls="controls-help">Controls</button>
+        </div>
+        <div id="controls-help" class="help-box" hidden>
+          <p><kbd>←</kbd><kbd>→</kbd> move · <kbd>Space</kbd>/<kbd>Z</kbd> jump (hold for height) · <kbd>X</kbd> attack (↑/↓ for directional) · <kbd>C</kbd>/<kbd>Shift</kbd> dash · <kbd>V</kbd> parry · <kbd>Esc</kbd> pause</p>
+          <p>Gamepad: A jump · X attack · B dash · Y parry · Start pause. Touch: on-screen pad and buttons.</p>
+          <p>Slide down walls by pushing into them; jump off to climb. Parry when the enemy's telegraph flashes white, then strike to execute.</p>
+        </div>
+        <p class="footer muted">Works offline · your progress stays on this device</p>
+      </div>
+    </section>
+
+    <!-- Pause / settings -->
+    <section id="screen-pause" class="screen" role="dialog" aria-modal="true" aria-labelledby="pause-heading" hidden>
+      <div class="panel panel-small">
+        <h2 id="pause-heading" class="h2">Paused</h2>
+        <div class="settings">
+          <label class="toggle"><input id="chk-mute" type="checkbox"><span>Mute audio</span></label>
+          <label class="toggle"><input id="chk-haptics" type="checkbox"><span>Vibration on hits</span></label>
+          <label class="toggle"><input id="chk-motion" type="checkbox"><span>Reduce screen shake</span></label>
+          <label class="field"><span class="label">Touch controls</span>
+            <select id="sel-touch"><option value="auto">Automatic</option><option value="on">Always on</option><option value="off">Off</option></select>
+          </label>
+        </div>
+        <div class="row">
+          <button id="btn-resume" class="btn btn-primary" type="button">Resume</button>
+          <button id="btn-quit" class="btn" type="button">Save &amp; quit</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Death -->
+    <section id="screen-dead" class="screen screen-dead" aria-live="assertive" hidden>
+      <p class="death-text">YOU HAVE FALLEN</p>
+      <p class="muted">Returning to the last shrine…</p>
+    </section>
+
+    <!-- Victory -->
+    <section id="screen-victory" class="screen" role="dialog" aria-modal="true" aria-labelledby="victory-heading" hidden>
+      <div class="panel panel-small">
+        <p class="eyebrow">The gate opens</p>
+        <h2 id="victory-heading" class="h2">The Road Ends Here</h2>
+        <p id="victory-stats" class="stats"></p>
+        <div class="row">
+          <button id="btn-again" class="btn btn-primary" type="button">Walk it again</button>
+          <button id="btn-victory-title" class="btn" type="button">Title</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Update / offline toast -->
+    <div id="toast" class="toast" role="status" hidden>
+      <span id="toast-text"></span>
+      <button id="toast-btn" class="btn btn-small" type="button" hidden>Reload</button>
+    </div>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
